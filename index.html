@@ -1,0 +1,1474 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JSON 格式化工具</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --faint: #6e7681;
+    --accent: #58a6ff;
+    --primary: #1f6feb;
+    --primary-hover: #388bfd;
+    --btn-bg: #21262d;
+    --btn-border: rgba(240, 246, 252, .12);
+    --ok: #3fb950;
+    --err: #f85149;
+    --btn-hover: #30363d;
+    --btn-active: #282e33;
+    --panel-header-bg: rgba(13, 17, 23, .6);
+    --c-key: #79c0ff;
+    --c-string: #a5d6ff;
+    --c-number: #d2a8ff;
+    --c-bool: #ff7b72;
+    --c-null: #ffa657;
+    --c-kw: #ff7b72;
+    --c-comment: #8b949e;
+    --scroll: #30363d;
+    --scroll-hover: #484f58;
+    --lineno: #484f58;
+    --mark-bg: rgba(210, 153, 34, .4);
+    --mark-text: #f2cc60;
+    --markcur-bg: #d29922;
+    --markcur-text: #0d1117;
+    --checker-a: #30363d;
+    --checker-b: #161b22;
+    --cc-a: #d29922;
+    --cc-b: #58a6ff;
+    --cc-common: #3fb950;
+  }
+
+  /* 浅色主题（GitHub Light 配色） */
+  body.light {
+    --bg: #f6f8fa;
+    --panel: #ffffff;
+    --border: #d0d7de;
+    --text: #1f2328;
+    --muted: #59636e;
+    --faint: #8c959f;
+    --accent: #0969da;
+    --primary: #1f6feb;
+    --primary-hover: #0969da;
+    --btn-bg: #f6f8fa;
+    --btn-border: rgba(31, 35, 40, .15);
+    --ok: #1a7f37;
+    --err: #d1242f;
+    --btn-hover: #eaeef2;
+    --btn-active: #dfe4e9;
+    --panel-header-bg: #f6f8fa;
+    --c-key: #0550ae;
+    --c-string: #0a3069;
+    --c-number: #8250df;
+    --c-bool: #cf222e;
+    --c-null: #953800;
+    --c-kw: #cf222e;
+    --c-comment: #59636e;
+    --scroll: #c6cdd4;
+    --scroll-hover: #8c959f;
+    --lineno: #8c959f;
+    --mark-bg: rgba(191, 135, 0, .3);
+    --mark-text: #7d4e00;
+    --markcur-bg: #bf8700;
+    --markcur-text: #ffffff;
+    --checker-a: #d0d7de;
+    --checker-b: #ffffff;
+    --cc-a: #9a6700;
+    --cc-b: #0969da;
+    --cc-common: #1a7f37;
+  }
+
+  /* 主题切换按钮 */
+  .theme-btn {
+    margin-left: auto;
+    padding: 6px 14px;
+    border: 1px solid var(--btn-border);
+    border-radius: 6px;
+    background: var(--btn-bg);
+    color: var(--text);
+    font-size: 13px;
+    cursor: pointer;
+    transition: border-color .15s ease;
+  }
+  .theme-btn:hover { border-color: var(--muted); }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    height: 100vh;          /* 固定视口高度：工具栏不随内容滚走，长内容在面板内滚动 */
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* 细滚动条 */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--scroll); border-radius: 5px; border: 2px solid var(--bg); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--scroll-hover); }
+
+  header {
+    padding: 18px 32px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .logo {
+    font-family: Consolas, monospace;
+    font-weight: 700;
+    font-size: 14px;
+    color: #fff;
+    background: linear-gradient(135deg, #1f6feb, #388bfd);
+    border-radius: 8px;
+    padding: 6px 9px;
+    box-shadow: 0 2px 10px rgba(56, 139, 253, .35);
+  }
+
+  header h1 { font-size: 20px; font-weight: 700; letter-spacing: .3px; }
+
+  header .subtitle { font-size: 13px; color: var(--faint); margin-left: 2px; }
+
+  /* 模式切换标签：分段控件 */
+  .tabs {
+    margin: 0 32px 14px;
+    align-self: flex-start;
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+
+  .tab {
+    padding: 7px 22px;
+    border: none;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--muted);
+    font-size: 14px;
+    cursor: pointer;
+    transition: all .15s ease;
+  }
+
+  .tab:hover { color: var(--text); }
+
+  .tab.active {
+    background: var(--primary);
+    color: #fff;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(31, 111, 235, .4);
+  }
+
+  /* 工具栏卡片 */
+  .toolbar {
+    margin: 0 32px 14px;
+    padding: 10px 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+
+  .btn {
+    padding: 6px 16px;
+    border: 1px solid var(--btn-border);
+    border-radius: 6px;
+    font-size: 13.5px;
+    cursor: pointer;
+    color: var(--text);
+    background: var(--btn-bg);
+    transition: background .15s ease, border-color .15s ease;
+  }
+
+  .btn:hover { background: var(--btn-hover); border-color: var(--muted); }
+  .btn:active { background: var(--btn-active); }
+
+  .btn-primary {
+    background: var(--primary);
+    border-color: rgba(240, 246, 252, .1);
+    font-weight: 600;
+  }
+  .btn-primary:hover { background: var(--primary-hover); border-color: rgba(240, 246, 252, .2); }
+
+  .indent-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .indent-group select {
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 13px;
+    cursor: pointer;
+    outline: none;
+  }
+
+  .indent-group select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(88, 166, 255, .25); }
+
+  .chk { display: flex; align-items: center; gap: 5px; font-size: 13px; color: var(--muted); cursor: pointer; user-select: none; }
+  .chk input { accent-color: var(--primary); cursor: pointer; }
+
+  main {
+    flex: 1;
+    padding: 0 32px 12px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: minmax(0, 1fr);
+    gap: 14px;
+    min-height: 0;
+  }
+
+  .panel {
+    display: flex;
+    flex-direction: column;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  .panel-header {
+    padding: 9px 14px;
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: .5px;
+    color: var(--muted);
+    background: var(--panel-header-bg);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .panel-header .hint { font-weight: 400; font-size: 12px; color: var(--faint); letter-spacing: 0; }
+
+  textarea, pre {
+    flex: 1;
+    padding: 14px 16px;
+    font-family: "JetBrains Mono", Consolas, "Courier New", monospace;
+    font-size: 13.5px;
+    line-height: 1.65;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text);
+    resize: none;
+    overflow: auto;
+    white-space: pre;
+    tab-size: 2;
+  }
+
+  textarea::placeholder { color: var(--faint); }
+
+  /* 语法高亮配色（GitHub Dark / Light 随主题切换） */
+  .key     { color: var(--c-key); }
+  .string  { color: var(--c-string); }
+  .number  { color: var(--c-number); }
+  .boolean { color: var(--c-bool); }
+  .null    { color: var(--c-null); }
+  .kw      { color: var(--c-kw); font-weight: 600; }
+  .comment { color: var(--c-comment); font-style: italic; }
+
+  /* 取色器 */
+  input[type="color"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 52px;
+    height: 34px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: transparent;
+    cursor: pointer;
+    padding: 2px;
+  }
+
+  .swatch-wrap {
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 16px;
+    border: 1px solid var(--border);
+    background: repeating-conic-gradient(var(--checker-a) 0% 25%, var(--checker-b) 0% 50%) 0 0 / 18px 18px;
+  }
+
+  .swatch { height: 150px; }
+
+  .color-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 4px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .color-label { width: 42px; color: var(--muted); font-size: 12px; font-weight: 600; }
+  .color-val   { flex: 1; color: var(--text); user-select: text; }
+  .color-copy  { padding: 4px 14px; font-size: 12px; }
+
+  /* JSON 折叠视图：屏幕外的行跳过渲染，大数据量下不卡 */
+  .jline { display: flex; min-width: max-content; content-visibility: auto; contain-intrinsic-size: auto 1.65em; }
+  .lineno {
+    flex: 0 0 2.6em;
+    text-align: right;
+    padding-right: 8px;
+    margin-right: 2px;
+    color: var(--lineno);
+    user-select: none;
+  }
+  .fold {
+    flex: 0 0 16px;
+    color: var(--accent);
+    cursor: pointer;
+    user-select: none;
+    text-align: center;
+  }
+  .fold:empty { cursor: default; }
+  .jcode { white-space: pre; flex: 0 0 auto; }
+  .ellipsis { color: var(--muted); }
+
+  /* 搜索 */
+  .search-group { display: flex; align-items: center; gap: 6px; }
+  #searchBox {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 10px;
+    color: var(--text);
+    font-size: 13px;
+    width: 150px;
+    outline: none;
+  }
+  #searchBox:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(88, 166, 255, .25); }
+  #wrapChar {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 8px;
+    color: var(--text);
+    font-size: 13px;
+    width: 52px;
+    text-align: center;
+    outline: none;
+  }
+  #wrapChar:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(88, 166, 255, .25); }
+  .btn-mini { padding: 6px 10px; }
+  .search-count { font-size: 12.5px; color: var(--muted); min-width: 56px; }
+  mark.hit { background: var(--mark-bg); color: var(--mark-text); border-radius: 3px; padding: 0 2px; }
+  mark.hit.current { background: var(--markcur-bg); color: var(--markcur-text); }
+
+  /* 数据比对表格 */
+  .diff-table { border-collapse: collapse; font-size: 13px; }
+  .diff-table th, .diff-table td {
+    border: 1px solid var(--border);
+    padding: 6px 12px;
+    text-align: left;
+    white-space: pre;
+  }
+  .diff-table th { background: var(--panel-header-bg); color: var(--muted); }
+  .col-idx { color: var(--faint); text-align: center !important; }
+  .col-result { color: var(--ok); }
+  .diff-row td { background: rgba(248, 81, 73, .12); }
+  .diff-row .col-result { color: var(--err); font-weight: 600; }
+
+  /* JSON 比对结果 */
+  .diff-add td { background: rgba(63, 185, 80, .12); }
+  .diff-del td { background: rgba(248, 81, 73, .12); }
+  .diff-chg td { background: rgba(210, 153, 34, .14); }
+  .diff-add .col-result { color: var(--ok); font-weight: 600; }
+  .diff-del .col-result { color: var(--err); font-weight: 600; }
+  .diff-chg .col-result { color: var(--markcur-bg); font-weight: 600; }
+  .cell-path { font-family: Consolas, monospace; color: var(--accent); }
+  .cell-val { white-space: pre-wrap; word-break: break-all; max-width: 400px; }
+  .diff-legend { font-size: 12.5px; color: var(--muted); margin-bottom: 10px; }
+
+  /* 输入框行号：与 textarea 同字体同行高，滚动同步 */
+  .editor { flex: 1; display: flex; min-height: 0; }
+  .gutter {
+    flex: 0 0 auto;
+    min-width: 2.2em;
+    padding: 14px 6px 14px 10px;
+    text-align: right;
+    color: var(--lineno);
+    font-family: "JetBrains Mono", Consolas, "Courier New", monospace;
+    font-size: 13.5px;
+    line-height: 1.65;
+    white-space: pre;
+    overflow: hidden;
+    user-select: none;
+    border-right: 1px solid var(--border);
+  }
+  #editorB { border-top: 1px solid var(--border); }
+
+  .statusbar {
+    margin: 0 32px 16px;
+    padding: 9px 14px;
+    border-radius: 10px;
+    font-size: 13px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--panel);
+    border: 1px solid var(--border);
+  }
+
+  .status-ok    { color: var(--ok); }
+  .status-error { color: var(--err); }
+  .status-idle  { color: var(--faint); }
+
+  #stats { color: var(--faint); font-size: 12.5px; }
+
+  @media (max-width: 800px) {
+    main { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="logo">{&hairsp;}</span>
+  <h1>格式化工具</h1>
+  <span class="subtitle">JSON / SQL / 取色 / 批处理 / 比对，全部本地处理，数据不上传</span>
+  <button class="theme-btn" id="themeToggle" onclick="toggleTheme()">浅色模式</button>
+</header>
+
+<div class="tabs">
+  <button class="tab active" id="tabJson" onclick="switchMode('json')">JSON</button>
+  <button class="tab" id="tabSql" onclick="switchMode('sql')">SQL</button>
+  <button class="tab" id="tabColor" onclick="switchMode('color')">取色器</button>
+  <button class="tab" id="tabBatch" onclick="switchMode('batch')">批处理</button>
+  <button class="tab" id="tabCompare" onclick="switchMode('compare')">比对</button>
+  <button class="tab" id="tabColcompare" onclick="switchMode('colcompare')">JSON 比对</button>
+</div>
+
+<div class="toolbar" id="toolbarJson">
+  <button class="btn btn-primary" onclick="formatJson()">格式化</button>
+  <button class="btn" onclick="deepFormatJson()">嵌套解析</button>
+  <button class="btn" onclick="compressJson()">压缩</button>
+  <button class="btn" onclick="escapeJson()">转义</button>
+  <button class="btn" onclick="unescapeJson()">去转义</button>
+  <button class="btn" onclick="copyOutput()">复制结果</button>
+  <button class="btn" onclick="loadSample()">示例</button>
+  <button class="btn" onclick="clearAll()">清空</button>
+  <div class="search-group">
+    <input type="text" id="searchBox" placeholder="搜索输出内容…" oninput="searchOutputDebounced()" onkeydown="searchKey(event)">
+    <button class="btn btn-mini" onclick="gotoHit(searchIdx - 1)" title="上一个">↑</button>
+    <button class="btn btn-mini" onclick="gotoHit(searchIdx + 1)" title="下一个">↓</button>
+    <span id="searchCount" class="search-count"></span>
+  </div>
+  <div class="indent-group">
+    <label class="chk" title="勾选后，格式化 / 嵌套解析 / 压缩的结果会同时替换输入框内容">
+      <input type="checkbox" id="writeBack">写回输入框
+    </label>
+    缩进
+    <select id="indent">
+      <option value="2" selected>2 空格</option>
+      <option value="4">4 空格</option>
+      <option value="tab">Tab</option>
+    </select>
+  </div>
+</div>
+
+<div class="toolbar" id="toolbarSql" style="display:none">
+  <button class="btn btn-primary" onclick="formatSql()">格式化</button>
+  <button class="btn" onclick="compressSql()">压缩为单行</button>
+  <button class="btn" onclick="copyOutput()">复制结果</button>
+  <button class="btn" onclick="loadSqlSample()">示例</button>
+  <button class="btn" onclick="clearAll()">清空</button>
+  <div class="indent-group">
+    关键字
+    <select id="kwCase">
+      <option value="upper" selected>大写</option>
+      <option value="keep">保持原样</option>
+    </select>
+  </div>
+</div>
+
+<div class="toolbar" id="toolbarColor" style="display:none">
+  <input type="color" id="nativePicker" value="#6366f1" title="可视化选色" onchange="pickNative()">
+  <button class="btn btn-primary" onclick="renderColor()">识别颜色</button>
+  <button class="btn" onclick="clearAll()">清空</button>
+  <div class="indent-group">支持 HEX / RGB / HSL / 颜色名，如 #FF5733、rgb(255,87,51)、hsl(9,100%,60%)、skyblue</div>
+</div>
+
+<div class="toolbar" id="toolbarBatch" style="display:none">
+  <button class="btn btn-primary" onclick="batchConvert(false)">转换</button>
+  <button class="btn" onclick="batchConvert(true)">格式化</button>
+  <button class="btn" onclick="stripWhitespace()">清除回车空格</button>
+  <button class="btn" onclick="copyOutput()">复制结果</button>
+  <button class="btn" onclick="loadBatchSample()">示例</button>
+  <button class="btn" onclick="clearAll()">清空</button>
+  <div class="indent-group">
+    包裹符号
+    <input type="text" id="wrapChar" value='"' maxlength="4" title="每条数据两端的符号，留空则不包裹">
+  </div>
+</div>
+
+<div class="toolbar" id="toolbarCompare" style="display:none">
+  <button class="btn btn-primary" onclick="compareRows()">比对</button>
+  <button class="btn" onclick="copyOutput()">复制差异</button>
+  <button class="btn" onclick="loadCompareSample()">示例</button>
+  <button class="btn" onclick="clearAll()">清空</button>
+  <div class="indent-group">输入两行数据逐列比对，列用 Tab（Excel 复制）或空格分隔</div>
+</div>
+
+<div class="toolbar" id="toolbarColcompare" style="display:none">
+  <button class="btn btn-primary" onclick="compareJson()">比对</button>
+  <button class="btn" onclick="copyOutput()">复制差异</button>
+  <button class="btn" onclick="loadJsonDiffSample()">示例</button>
+  <button class="btn" onclick="clearAll()">清空</button>
+  <div class="indent-group">上框 JSON A、下框 JSON B，递归比对并高亮差异</div>
+</div>
+
+<main>
+  <div class="panel">
+    <div class="panel-header">
+      <span id="inputTitle">输入</span>
+      <span class="hint" id="inputHint">粘贴后自动嵌套格式化 · 支持拖入 .json 文件 · Ctrl+Enter 手动格式化</span>
+    </div>
+    <div class="editor">
+      <div class="gutter" id="gutterA">1</div>
+      <textarea id="input" placeholder='在此粘贴 JSON，例如：{"name":"张三","age":18}' spellcheck="false" wrap="off"></textarea>
+    </div>
+    <div class="editor" id="editorB" style="display:none">
+      <div class="gutter" id="gutterB">1</div>
+      <textarea id="inputB" placeholder="JSON B，粘贴第二个 JSON 串" spellcheck="false" wrap="off"></textarea>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-header">
+      <span>输出</span>
+      <span class="hint" id="outputInfo"></span>
+    </div>
+    <pre id="output"></pre>
+    <textarea id="outputFast" readonly spellcheck="false" wrap="off" style="display:none"></textarea>
+  </div>
+</main>
+
+<div class="statusbar">
+  <span id="status" class="status-idle">等待输入…</span>
+  <span id="stats"></span>
+</div>
+
+<script>
+const input   = document.getElementById('input');
+const output  = document.getElementById('output');
+const outputFast = document.getElementById('outputFast'); // 大数据量输出快速通道（textarea 大文本渲染远快于 pre）
+const status  = document.getElementById('status');
+const stats   = document.getElementById('stats');
+const indent  = document.getElementById('indent');
+let mode = 'json';
+let modeData = {};        // 各模式独立保存的输入内容，切换时数据不互相带走
+let lastOutputText = '';   // 最近一次输出的纯文本，供复制使用（避免带出行号）
+let jsonFolds = {};        // 折叠范围：起始行 -> 结束行
+let searchHits = [];       // 搜索命中的 <mark> 元素
+let searchIdx = -1;
+let searchTimer = null;    // 搜索输入防抖定时器
+
+// ---------- 输入框行号 ----------
+const gutterA = document.getElementById('gutterA');
+const gutterB = document.getElementById('gutterB');
+
+function updateGutter(ta, gutter) {
+  const v = ta.value;
+  // indexOf 计数行数：超大文本 split('\n') 会生成几十万元素的数组
+  let n = 1, i = v.indexOf('\n');
+  while (i !== -1) { n++; i = v.indexOf('\n', i + 1); }
+  if (+gutter.dataset.lines !== n) {
+    gutter.dataset.lines = n;
+    // 行号超过 1 万行后封顶：构建/排版上百万个行号本身就会卡
+    const cap = Math.min(n, 10000);
+    const nums = new Array(cap);
+    for (let j = 0; j < cap; j++) nums[j] = j + 1;
+    gutter.textContent = nums.join('\n') + (n > cap ? '\n…' : '');
+  }
+  gutter.scrollTop = ta.scrollTop;
+}
+
+// 大数据量输出走只读 textarea（浏览器对 textarea 大文本有快速路径，
+// pre 里放几 MB 文本要为每个行框排版，百万行级别必卡）
+function renderBigText(text) {
+  output.style.display = 'none';
+  outputFast.style.display = '';
+  outputFast.value = text;
+}
+
+// 恢复普通 pre 输出（其他操作/模式使用）
+function renderNormalOutput() {
+  outputFast.style.display = 'none';
+  outputFast.value = '';
+  output.style.display = '';
+}
+
+// 程序化给输入框赋值（示例 / 模式切换 / 写回等）不触发 input 事件，
+// 这里重写 value 赋值来捕获，保证行号始终同步；用户键入粘贴由 input 事件覆盖
+const taValue = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value');
+[[input, gutterA], [document.getElementById('inputB'), gutterB]].forEach(function (pair) {
+  const ta = pair[0], gutter = pair[1];
+  Object.defineProperty(ta, 'value', {
+    get: function () { return taValue.get.call(this); },
+    set: function (v) { taValue.set.call(this, v); updateGutter(ta, gutter); }
+  });
+  ta.addEventListener('input', function () {
+    // 大内容时每次按键全量重算行号会卡，防抖 120ms；行号变化用户无感
+    clearTimeout(ta._gutterTimer);
+    ta._gutterTimer = setTimeout(function () { updateGutter(ta, gutter); }, 120);
+  });
+  ta.addEventListener('scroll', function () { gutter.scrollTop = ta.scrollTop; });
+  updateGutter(ta, gutter);
+});
+
+const MODES = ['json', 'sql', 'color', 'batch', 'compare', 'colcompare'];
+const MODE_UI = {
+  json:  { hint: '粘贴后自动嵌套格式化 · 支持拖入 .json 文件 · Ctrl+Enter 手动格式化', placeholder: '在此粘贴 JSON，例如：{"name":"张三","age":18}' },
+  sql:   { hint: 'Ctrl+Enter 格式化', placeholder: "在此粘贴 SQL，例如：select * from orders where status = 'PAID'" },
+  color: { hint: 'Ctrl+Enter 识别颜色', placeholder: '输入颜色编码，例如：#FF5733、rgb(255,87,51)、hsl(9,100%,60%)、skyblue' },
+  batch: { hint: '粘贴后自动转换 · 数据用空格或回车分隔 · Ctrl+Enter 手动转换', placeholder: '粘贴一批数据，用空格或回车分隔，例如：\nAAA001 BBB002\nCCC003' },
+  compare: { hint: '输入两行数据 · Ctrl+Enter 比对', placeholder: '粘贴两行数据逐列比对，列用 Tab（Excel 复制）或空格分隔\n\n第 1 行：0\t2026-06-09 16:47:35\tAAA\n第 2 行：0\t2026-06-09 16:47:35\tBBB' },
+  colcompare: { hint: '上下两框各粘贴一个 JSON · Ctrl+Enter 比对', placeholder: 'JSON A，粘贴第一个 JSON 串，例如：{"name":"张三","age":18}' }
+};
+
+function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+function switchMode(m) {
+  // 切换前把输入内容留在原模式，各模式数据互不带走
+  modeData[mode] = { a: input.value, b: document.getElementById('inputB').value };
+  mode = m;
+  MODES.forEach(function (x) {
+    document.getElementById('tab' + capitalize(x)).className = 'tab' + (x === m ? ' active' : '');
+    document.getElementById('toolbar' + capitalize(x)).style.display = x === m ? 'flex' : 'none';
+  });
+  // JSON 比对模式显示第二个输入框
+  document.getElementById('editorB').style.display = m === 'colcompare' ? '' : 'none';
+  document.getElementById('inputTitle').textContent = m === 'colcompare' ? 'JSON A / B' : '输入';
+  document.getElementById('inputHint').textContent = MODE_UI[m].hint;
+  input.placeholder = MODE_UI[m].placeholder;
+  const saved = modeData[m];
+  input.value = saved ? saved.a : '';
+  document.getElementById('inputB').value = saved ? saved.b : '';
+  renderNormalOutput();
+  output.textContent = '';
+  lastOutputText = '';
+  jsonFolds = {};
+  searchHits = [];
+  searchIdx = -1;
+  document.getElementById('searchCount').textContent = '';
+  document.getElementById('outputInfo').textContent = '';
+  stats.textContent = '';
+  setStatus('等待输入…', 'idle');
+  input.focus();
+}
+
+function setStatus(msg, type) {
+  status.textContent = msg;
+  status.className = 'status-' + type;
+}
+
+function updateStats(text) {
+  const bytes = new Blob([text]).size;
+  const size = bytes > 1024 ? (bytes / 1024).toFixed(1) + ' KB' : bytes + ' B';
+  // 不用 split('\n')：超大文本会生成巨大数组，indexOf 计数零内存分配
+  let lineCount = 1, i = text.indexOf('\n');
+  while (i !== -1) { lineCount++; i = text.indexOf('\n', i + 1); }
+  stats.textContent = '字符数：' + text.length + ' · 行数：' + lineCount + ' · 大小：' + size;
+}
+
+function syntaxHighlight(json) {
+  json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return json.replace(
+    /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
+    function (match) {
+      let cls = 'number';
+      if (/^"/.test(match)) {
+        cls = /:$/.test(match) ? 'key' : 'string';
+      } else if (/^(true|false)$/.test(match)) {
+        cls = 'boolean';
+      } else if (/^null$/.test(match)) {
+        cls = 'null';
+      }
+      return '<span class="' + cls + '">' + match + '</span>';
+    }
+  );
+}
+
+function getIndent() {
+  return indent.value === 'tab' ? '\t' : parseInt(indent.value, 10);
+}
+
+function showError(e) {
+  let msg = '✗ JSON 无效：' + e.message;
+  // 尝试从报错中提取位置，换算成行/列
+  const m = /position (\d+)/i.exec(e.message);
+  if (m) {
+    const pos = parseInt(m[1], 10);
+    const before = input.value.slice(0, pos);
+    const line = before.split('\n').length;
+    const col = pos - before.lastIndexOf('\n');
+    msg += '（第 ' + line + ' 行，第 ' + col + ' 列附近）';
+  }
+  setStatus(msg, 'error');
+  renderNormalOutput();
+  output.textContent = '';
+  document.getElementById('outputInfo').textContent = '';
+  stats.textContent = '';
+}
+
+function formatJson() {
+  if (!input.value.trim()) { setStatus('请先输入 JSON 内容', 'idle'); return; }
+  try {
+    const obj = JSON.parse(input.value);
+    const formatted = JSON.stringify(obj, null, getIndent());
+    if (document.getElementById('writeBack').checked) input.value = formatted;
+    renderJsonView(formatted);
+    document.getElementById('outputInfo').textContent = '已格式化 · 点击行首 ▼ 可折叠';
+    setStatus('✓ 有效的 JSON，格式化完成', 'ok');
+    updateStats(formatted);
+  } catch (e) { showError(e); }
+}
+
+// 递归解析：字符串字段若本身是 JSON，则展开为对象/数组
+function deepParse(value) {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if ((trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+        (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+      try { return deepParse(JSON.parse(trimmed)); }
+      catch (e) { return value; } // 解析失败说明只是普通字符串，原样保留
+    }
+    return value;
+  }
+  if (Array.isArray(value)) return value.map(deepParse);
+  if (value !== null && typeof value === 'object') {
+    const result = {};
+    for (const k in value) result[k] = deepParse(value[k]);
+    return result;
+  }
+  return value;
+}
+
+function deepFormatJson(auto) {
+  if (!input.value.trim()) { if (!auto) setStatus('请先输入 JSON 内容', 'idle'); return; }
+  try {
+    const obj = deepParse(JSON.parse(input.value));
+    const formatted = JSON.stringify(obj, null, getIndent());
+    if (document.getElementById('writeBack').checked) input.value = formatted;
+    renderJsonView(formatted);
+    document.getElementById('outputInfo').textContent = '已展开嵌套 JSON · 点击行首 ▼ 可折叠';
+    setStatus(auto ? '✓ 检测到粘贴，已自动嵌套格式化' : '✓ 已递归展开字符串中的嵌套 JSON', 'ok');
+    updateStats(formatted);
+  } catch (e) {
+    // 手动执行：明确报错；粘贴触发的自动执行：内容可能不完整，静默跳过且不清空已有输出
+    if (auto) setStatus('已粘贴，内容暂不是有效 JSON，未自动格式化', 'idle');
+    else showError(e);
+  }
+}
+
+function compressJson() {
+  if (!input.value.trim()) { setStatus('请先输入 JSON 内容', 'idle'); return; }
+  try {
+    const obj = JSON.parse(input.value);
+    const minified = JSON.stringify(obj);
+    if (document.getElementById('writeBack').checked) input.value = minified;
+    lastOutputText = minified;
+    output.innerHTML = syntaxHighlight(minified);
+    document.getElementById('outputInfo').textContent = '已压缩';
+    setStatus('✓ 有效的 JSON，压缩完成', 'ok');
+    updateStats(minified);
+  } catch (e) { showError(e); }
+}
+
+function escapeJson() {
+  const text = input.value;
+  if (!text.trim()) { setStatus('请先输入内容', 'idle'); return; }
+  const escaped = JSON.stringify(text);
+  lastOutputText = escaped;
+  output.innerHTML = syntaxHighlight(escaped);
+  document.getElementById('outputInfo').textContent = '已转义为字符串';
+  setStatus('✓ 转义完成', 'ok');
+  updateStats(escaped);
+}
+
+function unescapeJson() {
+  const text = input.value.trim();
+  if (!text) { setStatus('请先输入内容', 'idle'); return; }
+  try {
+    const unescaped = JSON.parse(text);
+    if (typeof unescaped !== 'string') {
+      setStatus('✗ 输入不是带引号的 JSON 字符串', 'error');
+      return;
+    }
+    lastOutputText = unescaped;
+    output.textContent = unescaped;
+    document.getElementById('outputInfo').textContent = '已去除转义';
+    setStatus('✓ 去转义完成', 'ok');
+    updateStats(unescaped);
+  } catch (e) { showError(e); }
+}
+
+function copyText(text) {
+  const done = function () { setStatus('✓ 已复制：' + (text.length > 40 ? text.slice(0, 40) + '…' : text), 'ok'); };
+  const fallback = function () {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    done();
+  };
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, fallback);
+    } else { fallback(); }
+  } catch (e) { fallback(); }
+}
+
+function copyOutput() {
+  const text = lastOutputText || output.textContent;
+  if (!text) { setStatus('没有可复制的内容', 'idle'); return; }
+  copyText(text);
+}
+
+function loadSample() {
+  input.value = JSON.stringify({
+    name: '张三',
+    age: 28,
+    isMember: true,
+    address: null,
+    hobbies: ['篮球', '编程', '旅行'],
+    score: 98.5,
+    company: { name: '京博物流', department: '信息部', founded: 2015 }
+  });
+  formatJson();
+}
+
+function clearAll() {
+  input.value = '';
+  document.getElementById('inputB').value = '';
+  renderNormalOutput();
+  output.textContent = '';
+  lastOutputText = '';
+  jsonFolds = {};
+  searchHits = [];
+  searchIdx = -1;
+  document.getElementById('searchCount').textContent = '';
+  document.getElementById('outputInfo').textContent = '';
+  setStatus('等待输入…', 'idle');
+  stats.textContent = '';
+  input.focus();
+}
+
+// 按当前模式执行主操作
+function runCurrent() {
+  if (mode === 'sql') formatSql();
+  else if (mode === 'color') renderColor();
+  else if (mode === 'batch') batchConvert(false);
+  else if (mode === 'compare') compareRows();
+  else if (mode === 'colcompare') compareJson();
+  else formatJson();
+}
+
+// Ctrl+Enter 快捷执行（按当前模式分发）
+input.addEventListener('keydown', function (e) {
+  if (e.ctrlKey && e.key === 'Enter') runCurrent();
+});
+
+// 粘贴后自动执行（JSON：嵌套格式化；批处理：转换；其他模式仍手动执行）
+// 延迟到下一拍执行：粘贴本身还没渲染完就同步做转换会卡住界面
+input.addEventListener('input', function (e) {
+  if (e.inputType !== 'insertFromPaste') return;
+  setTimeout(function () {
+    if (mode === 'json') deepFormatJson(true);
+    else if (mode === 'batch') batchConvert(false);
+  }, 0);
+});
+
+// 拖入文件
+input.addEventListener('dragover', function (e) { e.preventDefault(); });
+input.addEventListener('drop', function (e) {
+  e.preventDefault();
+  const file = e.dataTransfer.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function () {
+    input.value = reader.result;
+    if (mode === 'json') deepFormatJson(); else runCurrent();
+  };
+  reader.readAsText(file);
+});
+
+// 输入框支持 Tab 键缩进
+input.addEventListener('keydown', function (e) {
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    const s = this.selectionStart;
+    this.value = this.value.slice(0, s) + '  ' + this.value.slice(this.selectionEnd);
+    this.selectionStart = this.selectionEnd = s + 2;
+  }
+});
+
+// ---------- SQL 格式化 ----------
+const SQL_KEYWORDS = ['GROUP BY','ORDER BY','UNION ALL','LEFT JOIN','RIGHT JOIN','INNER JOIN','FULL JOIN','CROSS JOIN','INSERT INTO','DELETE FROM',
+  'SELECT','FROM','WHERE','HAVING','LIMIT','OFFSET','UNION','JOIN','VALUES','UPDATE','SET',
+  'CASE','WHEN','THEN','ELSE','END','AND','OR','ON','AS','ASC','DESC','DISTINCT','BETWEEN','IN','IS','NOT','NULL','LIKE','EXISTS'];
+
+// 提取字符串字面量和注释为占位符，避免误处理其内容
+function protectLiterals(sql) {
+  const store = [];
+  const s = sql.replace(/'(?:[^']|'')*'|"(?:[^"]|"")*"|`[^`]*`|--[^\n]*|\/\*[\s\S]*?\*\//g,
+    function (m) { store.push(m); return '\u0001' + (store.length - 1) + '\u0002'; });
+  return [s, store];
+}
+
+function restoreLiterals(s, store) {
+  return s.replace(/\u0001(\d+)\u0002/g, function (m, i) { return store[Number(i)]; });
+}
+
+function formatSqlText(sql, uppercase) {
+  const pair = protectLiterals(sql);
+  let s = pair[0].replace(/\s+/g, ' ').trim();
+  const store = pair[1];
+
+  // 关键字大写（多字关键字优先）
+  if (uppercase) {
+    SQL_KEYWORDS.forEach(function (k) {
+      s = s.replace(new RegExp('\\b' + k.replace(/ /g, '\\s+') + '\\b', 'gi'), k);
+    });
+  }
+
+  // 主句关键字前换行（多字关键字先处理）
+  ['UNION ALL','GROUP BY','ORDER BY','INSERT INTO','DELETE FROM','LEFT JOIN','RIGHT JOIN','INNER JOIN','FULL JOIN','CROSS JOIN'].forEach(function (k) {
+    s = s.replace(new RegExp('\\b(' + k.replace(/ /g, '\\s+') + ')\\b', 'gi'), '\n$1');
+  });
+  // 单字关键字，用环视避开多字关键字内部（如 DELETE FROM 里的 FROM）
+  ['SELECT','WHERE','HAVING','LIMIT','OFFSET','VALUES','UPDATE','SET'].forEach(function (k) {
+    s = s.replace(new RegExp('\\b(' + k + ')\\b', 'gi'), '\n$1');
+  });
+  s = s.replace(/(?<!DELETE )\b(FROM)\b/gi, '\n$1');
+  s = s.replace(/\b(UNION)\b(?!\s+ALL)/gi, '\n$1');
+  s = s.replace(/(?<!LEFT )(?<!RIGHT )(?<!INNER )(?<!FULL )(?<!CROSS )\b(JOIN)\b/gi, '\n$1');
+  ['AND','OR','ON','WHEN','ELSE','END'].forEach(function (k) {
+    s = s.replace(new RegExp('\\b(' + k + ')\\b', 'gi'), '\n$1');
+  });
+
+  // 子查询：含 SELECT 的最内层括号，括号单独成行
+  let prev;
+  do {
+    prev = s;
+    s = s.replace(/\(\s*(SELECT[^()]*?)\s*\)/gi, function (m, inner) {
+      return '(\n' + inner.trim() + '\n)';
+    });
+  } while (s !== prev);
+
+  // 按行重组：括号栈决定缩进级，条件类关键字额外缩进一级
+  let level = 0;
+  const stack = [];
+  const lines = [];
+  s.split('\n').forEach(function (raw) {
+    const line = raw.trim();
+    if (!line) return;
+    const startsClose = line.charAt(0) === ')';
+    const lineLevel = startsClose ? (stack.length ? stack.pop() : level + 1) - 1 : level;
+    const extra = !startsClose && /^(AND|OR|ON|WHEN|ELSE)\b/i.test(line) ? 1 : 0;
+    lines.push('  '.repeat(Math.max(0, lineLevel + extra)) + line);
+    // 统计本行括号：开括号压栈（内容缩进级），闭括号弹栈
+    const body = startsClose ? line.slice(1) : line;
+    const net = (body.match(/\(/g) || []).length - (body.match(/\)/g) || []).length;
+    for (let i = 0; i < net; i++) stack.push(lineLevel + extra + 1);
+    for (let i = 0; i < -net; i++) stack.pop();
+    level = stack.length ? stack[stack.length - 1] : 0;
+  });
+
+  return restoreLiterals(lines.join('\n'), store);
+}
+
+function highlightSql(sql) {
+  const esc = sql.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const kwPattern = SQL_KEYWORDS.map(function (k) { return k.replace(/ /g, '\\s+'); }).join('|');
+  return esc.replace(new RegExp(
+    "('(?:[^']|'')*')|(--[^\\n]*)|(/\\*[\\s\\S]*?\\*/)|(\\b(?:" + kwPattern + ")\\b)|(\\b\\d+(?:\\.\\d+)?\\b)", 'gi'),
+    function (m, str, lc, bc, kwd, num) {
+      if (str) return '<span class="string">' + str + '</span>';
+      if (lc || bc) return '<span class="comment">' + m + '</span>';
+      if (kwd) return '<span class="kw">' + kwd + '</span>';
+      if (num) return '<span class="number">' + num + '</span>';
+      return m;
+    });
+}
+
+function formatSql() {
+  if (!input.value.trim()) { setStatus('请先输入 SQL 内容', 'idle'); return; }
+  const upper = document.getElementById('kwCase').value === 'upper';
+  const formatted = formatSqlText(input.value, upper);
+  lastOutputText = formatted;
+  output.innerHTML = highlightSql(formatted);
+  document.getElementById('outputInfo').textContent = '已格式化';
+  setStatus('✓ SQL 格式化完成', 'ok');
+  updateStats(formatted);
+}
+
+function compressSql() {
+  if (!input.value.trim()) { setStatus('请先输入 SQL 内容', 'idle'); return; }
+  const pair = protectLiterals(input.value);
+  const oneLine = restoreLiterals(pair[0].replace(/\s+/g, ' ').trim(), pair[1]);
+  lastOutputText = oneLine;
+  output.innerHTML = highlightSql(oneLine);
+  document.getElementById('outputInfo').textContent = '已压缩为单行';
+  setStatus('✓ 已压缩为单行', 'ok');
+  updateStats(oneLine);
+}
+
+function loadSqlSample() {
+  input.value = "select o.order_no, o.amount, c.name, case when o.status = 'PAID' then '已支付' else '未支付' end as status_text from orders o left join customers c on c.id = o.customer_id where o.status = 'PAID' and o.created_at >= '2026-01-01' and c.id in (select id from customers where level = 'VIP') group by o.order_no having count(*) > 1 order by o.amount desc limit 10";
+  formatSql();
+}
+
+// ---------- 取色器 ----------
+// 借助浏览器 CSS 引擎解析颜色，天然支持 #hex / rgb() / hsl() / 颜色名
+function parseColorInput(str) {
+  str = str.trim();
+  if (!str) return null;
+  // 裸 HEX：F53 / FF5733 / FF5733CC
+  if (/^([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(str)) str = '#' + str;
+  // 裸 RGB：255,87,51 或 255,87,51,0.5
+  else if (/^\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}(\s*,\s*(0|1|0?\.\d+))?$/.test(str)) str = 'rgb(' + str + ')';
+  const el = document.createElement('div');
+  el.style.color = '';
+  el.style.color = str;
+  if (!el.style.color) return null;
+  el.style.display = 'none';
+  document.body.appendChild(el);
+  const computed = getComputedStyle(el).color;
+  document.body.removeChild(el);
+  const m = computed.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+  if (!m) return null;
+  return { r: +m[1], g: +m[2], b: +m[3], a: m[4] !== undefined ? +m[4] : 1 };
+}
+
+function toHex(n) { return n.toString(16).padStart(2, '0').toUpperCase(); }
+
+function rgbToHex(r, g, b) { return '#' + toHex(r) + toHex(g) + toHex(b); }
+
+function rgbToHsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h = 0, s = 0;
+  const l = (max + min) / 2;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    if (max === r) h = (g - b) / d + (g < b ? 6 : 0);
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h *= 60;
+  }
+  return { h: Math.round(h), s: Math.round(s * 100), l: Math.round(l * 100) };
+}
+
+function colorRow(label, value) {
+  return '<div class="color-row"><span class="color-label">' + label + '</span>' +
+    '<span class="color-val">' + value + '</span>' +
+    '<button class="btn color-copy" onclick="copyText(\'' + value.replace(/'/g, "\\'") + '\')">复制</button></div>';
+}
+
+function renderColor() {
+  const raw = input.value.trim();
+  if (!raw) { setStatus('请先输入颜色编码', 'idle'); return; }
+  const c = parseColorInput(raw);
+  if (!c) {
+    setStatus('✗ 无法识别的颜色编码：' + raw, 'error');
+    output.textContent = '';
+    document.getElementById('outputInfo').textContent = '';
+    return;
+  }
+  const hex = rgbToHex(c.r, c.g, c.b);
+  const hsl = rgbToHsl(c.r, c.g, c.b);
+  const rgbText = c.a < 1 ? 'rgba(' + c.r + ', ' + c.g + ', ' + c.b + ', ' + c.a + ')'
+                          : 'rgb(' + c.r + ', ' + c.g + ', ' + c.b + ')';
+  const hslText = c.a < 1 ? 'hsla(' + hsl.h + ', ' + hsl.s + '%, ' + hsl.l + '%, ' + c.a + ')'
+                          : 'hsl(' + hsl.h + ', ' + hsl.s + '%, ' + hsl.l + '%)';
+  document.getElementById('nativePicker').value = hex;
+  output.innerHTML =
+    '<div class="swatch-wrap"><div class="swatch" style="background:' + rgbText + '"></div></div>' +
+    colorRow('HEX', hex) +
+    colorRow('RGB', rgbText) +
+    colorRow('HSL', hslText);
+  document.getElementById('outputInfo').textContent = '识别自：' + raw;
+  setStatus('✓ 识别成功，点击对应行可复制', 'ok');
+}
+
+// 原生选色盘选色后同步到输入框并渲染
+function pickNative() {
+  input.value = document.getElementById('nativePicker').value;
+  renderColor();
+}
+
+// ---------- 批处理 ----------
+// 把空格/回车分隔的数据逐条加包裹符号，用英文逗号连接
+// oneLine=true 时输出单行（格式化按钮）
+function batchConvert(oneLine) {
+  const raw = input.value.trim();
+  if (!raw) { setStatus('请先输入数据', 'idle'); return; }
+  const q = document.getElementById('wrapChar').value;
+  // 单趟 replace 完成分隔 + 包裹 + 计数，不再生成几十万条数据的中间数组
+  let count = 1;
+  const sep = oneLine ? q + ',' + q : q + ',\n' + q;
+  const text = q + raw.replace(/\s+/g, function () { count++; return sep; }) + q;
+  lastOutputText = text;
+  if (count > 3000 || text.length > 300000) {
+    renderBigText(text);
+    document.getElementById('outputInfo').textContent = '共 ' + count + ' 条' + (oneLine ? ' · 单行' : '') + ' · 大数据量快速渲染';
+  } else {
+    renderNormalOutput();
+    output.innerHTML = syntaxHighlight(text);
+    document.getElementById('outputInfo').textContent = '共 ' + count + ' 条' + (oneLine ? ' · 单行' : '');
+  }
+  setStatus('✓ 转换完成，共 ' + count + ' 条数据', 'ok');
+  updateStats(text);
+}
+
+function loadBatchSample() {
+  input.value = 'AAA001 BBB002\nCCC003\n\tDDD004\n\nEEE005';
+  batchConvert(false);
+}
+
+// 只清除文本中的回车和空格，不做包裹、不加逗号
+function stripWhitespace() {
+  const raw = input.value;
+  if (!raw.trim()) { setStatus('请先输入数据', 'idle'); return; }
+  const text = raw.replace(/\s+/g, '');
+  lastOutputText = text;
+  if (text.length > 300000) renderBigText(text);
+  else { renderNormalOutput(); output.textContent = text; }
+  document.getElementById('outputInfo').textContent = '仅清除回车和空格';
+  setStatus('✓ 已清除回车和空格', 'ok');
+  updateStats(text);
+}
+
+// ---------- 数据比对 ----------
+function escapeHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// 按 Tab（Excel 复制）或连续空白分列
+function splitRow(line) {
+  return line.indexOf('\t') !== -1 ? line.split('\t') : line.trim().split(/\s+/);
+}
+
+function compareRows() {
+  const lines = input.value.replace(/\r/g, '').split('\n').filter(function (l) { return l.trim(); });
+  if (lines.length < 2) { setStatus('请输入两行数据进行比对', 'idle'); return; }
+  const a = splitRow(lines[0]);
+  const b = splitRow(lines[1]);
+  const n = Math.max(a.length, b.length);
+  let diffCount = 0;
+  const rows = [];
+  const textLines = [];
+  for (let i = 0; i < n; i++) {
+    const va = i < a.length ? a[i] : '';
+    const vb = i < b.length ? b[i] : '';
+    const missing = i >= a.length ? '行1无此列' : (i >= b.length ? '行2无此列' : '');
+    const same = va === vb && !missing;
+    if (!same) {
+      diffCount++;
+      textLines.push('列' + (i + 1) + '：行1=' + va + ' | 行2=' + vb + (missing ? '（' + missing + '）' : ''));
+    }
+    rows.push('<tr' + (same ? '' : ' class="diff-row"') + '><td class="col-idx">' + (i + 1) + '</td>' +
+      '<td>' + escapeHtml(va) + '</td><td>' + escapeHtml(vb) + '</td>' +
+      '<td class="col-result">' + (same ? '✓' : '✗' + (missing ? ' ' + missing : '')) + '</td></tr>');
+  }
+  output.innerHTML = '<table class="diff-table"><thead><tr><th>#</th><th>第 1 行</th><th>第 2 行</th><th>结果</th></tr></thead>' +
+    '<tbody>' + rows.join('') + '</tbody></table>';
+  lastOutputText = textLines.length ? textLines.join('\n') : '两行数据完全一致（共 ' + n + ' 列）';
+  document.getElementById('outputInfo').textContent = '共 ' + n + ' 列，' + diffCount + ' 列不同';
+  setStatus(diffCount ? '✓ 比对完成：共 ' + n + ' 列，其中 ' + diffCount + ' 列不同（红色标出）'
+                      : '✓ 两行数据完全一致（共 ' + n + ' 列）', 'ok');
+}
+
+function loadCompareSample() {
+  input.value =
+    '0\t2026-06-09 16:47:35\t0\t2026-06-24 21:13:25.510\t2164\tcustomArea\tOMS-地点接收\t10000\t200\t0\t0\t0\t1\tOMS地点接收接口\t0\t0\t/E6/api/oms/customArea/save\tcustomArea\n' +
+    '1\t2026-06-09 16:47:35\t0\t2026-06-25 08:30:11.220\t2164\tcustomArea\tOMS-地点接收\t10000\t300\t0\t0\t0\t1\tOMS地点接收接口\t0\t0\t/E6/api/oms/customArea/update\tcustomArea';
+  compareRows();
+}
+
+// ---------- JSON 比对 ----------
+// 递归比对上下两个 JSON，找出仅 A 有（删除）、仅 B 有（新增）、值不同的字段
+function jsonType(v) {
+  if (v === null) return 'null';
+  if (Array.isArray(v)) return 'array';
+  return typeof v;
+}
+
+function fmtKey(k) { return /^[A-Za-z_$][\w$]*$/.test(k) ? '.' + k : '["' + k + '"]'; }
+
+function diffJson(a, b, path, out) {
+  const ta = jsonType(a), tb = jsonType(b);
+  if (ta !== tb) { out.push({ path: path, kind: 'chg', a: a, b: b, note: '类型 ' + ta + ' → ' + tb }); return; }
+  if (ta === 'object') {
+    Object.keys(a).concat(Object.keys(b).filter(function (k) { return !(k in a); }))
+      .forEach(function (k) {
+        const p = path + fmtKey(k);
+        if (!(k in a)) out.push({ path: p, kind: 'add', b: b[k] });
+        else if (!(k in b)) out.push({ path: p, kind: 'del', a: a[k] });
+        else diffJson(a[k], b[k], p, out);
+      });
+  } else if (ta === 'array') {
+    const n = Math.max(a.length, b.length);
+    for (let i = 0; i < n; i++) {
+      const p = path + '[' + i + ']';
+      if (i >= a.length) out.push({ path: p, kind: 'add', b: b[i] });
+      else if (i >= b.length) out.push({ path: p, kind: 'del', a: a[i] });
+      else diffJson(a[i], b[i], p, out);
+    }
+  } else if (a !== b) {
+    out.push({ path: path, kind: 'chg', a: a, b: b });
+  }
+}
+
+function fmtVal(v) { return v === undefined ? '—' : JSON.stringify(v); }
+
+function compareJson() {
+  const va = input.value.trim();
+  const vb = document.getElementById('inputB').value.trim();
+  if (!va && !vb) { setStatus('请在上下两框各粘贴一个 JSON', 'idle'); return; }
+  let a, b;
+  try { a = JSON.parse(va); } catch (e) { setStatus('✗ JSON A 无效：' + e.message, 'error'); return; }
+  try { b = JSON.parse(vb); } catch (e) { setStatus('✗ JSON B 无效：' + e.message, 'error'); return; }
+
+  const diffs = [];
+  diffJson(a, b, '$', diffs);
+
+  if (!diffs.length) {
+    output.textContent = '';
+    lastOutputText = '两个 JSON 完全一致';
+    document.getElementById('outputInfo').textContent = '';
+    setStatus('✓ 两个 JSON 内容完全一致', 'ok');
+    return;
+  }
+
+  const KIND = {
+    add: { cls: 'diff-add', label: '✚ 仅 B 有', tag: '[新增]' },
+    del: { cls: 'diff-del', label: '✖ 仅 A 有', tag: '[删除]' },
+    chg: { cls: 'diff-chg', label: '≠ 值不同', tag: '[修改]' }
+  };
+  const rows = diffs.map(function (d) {
+    const m = KIND[d.kind];
+    return '<tr class="' + m.cls + '">' +
+      '<td class="cell-path">' + escapeHtml(d.path) + '</td>' +
+      '<td class="col-result">' + m.label + (d.note ? '（' + d.note + '）' : '') + '</td>' +
+      '<td class="cell-val">' + syntaxHighlight(fmtVal(d.a)) + '</td>' +
+      '<td class="cell-val">' + syntaxHighlight(fmtVal(d.b)) + '</td></tr>';
+  });
+  output.innerHTML = '<div class="diff-legend">✚ 仅 B 有（新增） · ✖ 仅 A 有（删除） · ≠ 值不同（含类型变化）</div>' +
+    '<table class="diff-table"><thead><tr><th>路径</th><th>差异</th><th>JSON A 的值</th><th>JSON B 的值</th></tr></thead>' +
+    '<tbody>' + rows.join('') + '</tbody></table>';
+
+  lastOutputText = diffs.map(function (d) {
+    const m = KIND[d.kind];
+    if (d.kind === 'add') return m.tag + ' ' + d.path + ' = ' + fmtVal(d.b);
+    if (d.kind === 'del') return m.tag + ' ' + d.path + ' = ' + fmtVal(d.a);
+    return m.tag + ' ' + d.path + '：A=' + fmtVal(d.a) + ' → B=' + fmtVal(d.b) + (d.note ? '（' + d.note + '）' : '');
+  }).join('\n');
+
+  const count = function (k) { return diffs.filter(function (d) { return d.kind === k; }).length; };
+  document.getElementById('outputInfo').textContent =
+    '共 ' + diffs.length + ' 处差异：新增 ' + count('add') + ' · 删除 ' + count('del') + ' · 值不同 ' + count('chg');
+  setStatus('✓ 比对完成：共 ' + diffs.length + ' 处差异（绿色新增 · 红色删除 · 黄色值不同）', 'ok');
+}
+
+function loadJsonDiffSample() {
+  input.value = JSON.stringify({
+    id: 1001, name: '张三', age: 28, isMember: true, score: 98.5,
+    address: { city: '北京', zip: '100000' },
+    tags: ['vip', 'new']
+  });
+  document.getElementById('inputB').value = JSON.stringify({
+    id: 1001, name: '李四', age: 28, isMember: false, score: 98.5,
+    address: { city: '上海', zip: '100000', street: '中关村大街' },
+    tags: ['vip'],
+    email: 'lisi@example.com'
+  });
+  compareJson();
+}
+
+// ---------- JSON 折叠视图 ----------
+// 去掉字符串内容，避免把字符串里的括号计入折叠匹配
+function stripJsonStrings(line) {
+  return line.replace(/"(\\.|[^"\\])*"/g, '""');
+}
+
+function renderJsonView(text) {
+  lastOutputText = text;
+  jsonFolds = {};
+  searchHits = [];
+  searchIdx = -1;
+
+  const lines = text.split('\n');
+
+  // 第一遍：用括号栈找出每个可折叠块的起止行
+  const stack = [];
+  lines.forEach(function (line, i) {
+    const code = stripJsonStrings(line);
+    for (let c = 0; c < code.length; c++) {
+      const ch = code.charAt(c);
+      if (ch === '{' || ch === '[') stack.push(i);
+      else if (ch === '}' || ch === ']') {
+        const open = stack.pop();
+        if (open !== undefined && i > open) jsonFolds[open] = i;
+      }
+    }
+  });
+
+  // 第二遍：逐行渲染，带行号和折叠箭头
+  output.innerHTML = lines.map(function (line, i) {
+    const hasFold = jsonFolds[i] !== undefined;
+    const arrow = hasFold
+      ? '<span class="fold" onclick="toggleFold(' + i + ')">▼</span>'
+      : '<span class="fold"></span>';
+    const ellipsis = hasFold
+      ? '<span class="ellipsis" id="ell' + i + '" style="display:none"> … ' +
+        (stripJsonStrings(line).trim().slice(-1) === '{' ? '}' : ']') + '</span>'
+      : '';
+    return '<div class="jline" id="jl' + i + '"><span class="lineno">' + (i + 1) + '</span>' +
+      arrow + '<span class="jcode">' + syntaxHighlight(line) + ellipsis + '</span></div>';
+  }).join('');
+
+  // 搜索框有内容时重新高亮
+  if (document.getElementById('searchBox').value) searchOutput();
+}
+
+function toggleFold(open) {
+  const end = jsonFolds[open];
+  if (end === undefined) return;
+  const arrow = document.querySelector('#jl' + open + ' .fold');
+  const collapsed = arrow.textContent === '▶';
+  for (let i = open + 1; i <= end; i++) {
+    document.getElementById('jl' + i).style.display = collapsed ? '' : 'none';
+  }
+  arrow.textContent = collapsed ? '▼' : '▶';
+  document.getElementById('ell' + open).style.display = collapsed ? 'none' : 'inline';
+}
+
+// 展开包含指定行的所有折叠块（搜索跳转时用）
+function expandToLine(idx) {
+  Object.keys(jsonFolds).forEach(function (k) {
+    const open = +k;
+    if (open < idx && idx <= jsonFolds[k]) {
+      const arrow = document.querySelector('#jl' + open + ' .fold');
+      if (arrow && arrow.textContent === '▶') toggleFold(open);
+    }
+  });
+}
+
+// ---------- 搜索 ----------
+function searchKey(e) {
+  if (e.key === 'Enter') {
+    // 防抖中的搜索立即执行，保证回车跳转的是最新结果
+    if (searchTimer) { clearTimeout(searchTimer); searchTimer = null; searchOutput(); }
+    gotoHit(searchIdx + (e.shiftKey ? -1 : 1));
+  }
+}
+
+// 大数据量时避免每敲一个字符就全量扫描一遍，防抖 200ms
+function searchOutputDebounced() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(function () { searchTimer = null; searchOutput(); }, 200);
+}
+
+function searchOutput() {
+  // 清除上次的高亮标记
+  output.querySelectorAll('mark.hit').forEach(function (m) {
+    const parent = m.parentNode;
+    parent.replaceChild(document.createTextNode(m.textContent), m);
+    parent.normalize();
+  });
+  searchHits = [];
+  searchIdx = -1;
+  const q = document.getElementById('searchBox').value;
+  const cnt = document.getElementById('searchCount');
+  if (!q) { cnt.textContent = ''; return; }
+  // 大数据量快速通道（只读 textarea）内无法插入高亮标记，停用搜索
+  if (outputFast.style.display !== 'none') { cnt.textContent = '大数据量模式不支持搜索'; return; }
+
+  // 遍历输出区所有文本节点，命中处包 <mark>（跳过行号、箭头、折叠占位符）
+  const walker = document.createTreeWalker(output, NodeFilter.SHOW_TEXT, null);
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  const ql = q.toLowerCase();
+  nodes.forEach(function (node) {
+    const cls = node.parentNode ? node.parentNode.className : '';
+    if (cls === 'lineno' || cls === 'fold' || cls === 'ellipsis') return;
+    const text = node.nodeValue;
+    const lower = text.toLowerCase();
+    if (lower.indexOf(ql) === -1) return;
+    const frag = document.createDocumentFragment();
+    let last = 0, pos;
+    while ((pos = lower.indexOf(ql, last)) !== -1) {
+      if (pos > last) frag.appendChild(document.createTextNode(text.slice(last, pos)));
+      const mark = document.createElement('mark');
+      mark.className = 'hit';
+      mark.textContent = text.substr(pos, q.length);
+      frag.appendChild(mark);
+      searchHits.push(mark);
+      last = pos + q.length;
+    }
+    frag.appendChild(document.createTextNode(text.slice(last)));
+    node.parentNode.replaceChild(frag, node);
+  });
+
+  cnt.textContent = searchHits.length ? ('共 ' + searchHits.length + ' 个') : '无匹配';
+  if (searchHits.length) gotoHit(0);
+}
+
+function gotoHit(i) {
+  if (!searchHits.length) return;
+  searchIdx = ((i % searchHits.length) + searchHits.length) % searchHits.length;
+  searchHits.forEach(function (m) { m.classList.remove('current'); });
+  const m = searchHits[searchIdx];
+  m.classList.add('current');
+  // 命中在折叠区域内时自动展开
+  const line = m.closest ? m.closest('.jline') : null;
+  if (line && line.style.display === 'none') expandToLine(parseInt(line.id.slice(2), 10));
+  m.scrollIntoView({ block: 'center' });
+  document.getElementById('searchCount').textContent = (searchIdx + 1) + ' / ' + searchHits.length;
+}
+
+// ---------- 主题切换 ----------
+function setTheme(t) {
+  document.body.className = t === 'light' ? 'light' : '';
+  document.getElementById('themeToggle').textContent = t === 'light' ? '深色模式' : '浅色模式';
+  try { localStorage.setItem('theme', t); } catch (e) {}
+}
+
+function toggleTheme() {
+  setTheme(document.body.className === 'light' ? 'dark' : 'light');
+}
+
+// 启动时恢复上次选择的主题
+(function initTheme() {
+  let t = 'dark';
+  try { t = localStorage.getItem('theme') || 'dark'; } catch (e) {}
+  setTheme(t);
+})();
+</script>
+
+</body>
+</html>
